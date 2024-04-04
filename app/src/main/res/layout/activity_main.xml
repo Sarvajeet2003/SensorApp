@@ -28,5 +28,4 @@
         android:text="Yaw: "
         android:layout_below="@id/pitchTextView"
         android:layout_marginTop="20dp"/>
-
 </RelativeLayout>
