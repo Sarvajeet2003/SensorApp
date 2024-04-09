@@ -3,6 +3,7 @@ package com.example.ass3_q1
 import android.Manifest
 import android.annotation.SuppressLint
 import android.content.ContentValues
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.database.Cursor
 import android.hardware.Sensor
@@ -10,9 +11,11 @@ import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.os.Bundle
+import android.widget.Button
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import java.io.Serializable
 import kotlin.math.atan2
 import kotlin.math.pow
 import kotlin.math.sqrt
@@ -51,11 +54,16 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         initializeSensors()
         dbHelper = DatabaseHelper(this)
         printOrientationData()
+        val graphButton = findViewById<Button>(R.id.graphButton)
+        graphButton.setOnClickListener {
+            navigateToGraphActivity()
+        }
     }
-
     private fun addOrientation(roll: Float, pitch: Float, yaw: Float) {
         val db = dbHelper.writableDatabase
+        val currentTimeMillis = System.currentTimeMillis()
         val values = ContentValues().apply {
+            put(DatabaseHelper.KEY_TIMESTAMP, currentTimeMillis)
             put(DatabaseHelper.KEY_ROLL, roll)
             put(DatabaseHelper.KEY_PITCH, pitch)
             put(DatabaseHelper.KEY_YAW, yaw)
@@ -63,6 +71,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         db.insert(DatabaseHelper.TABLE_ORIENTATION, null, values)
         db.close()
     }
+
 
 
     private fun arePermissionsGranted(): Boolean {
@@ -224,4 +233,14 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         cursor.close()
         db.close()
     }
+    private fun navigateToGraphActivity() {
+        // Retrieve orientation data from the database
+        val orientationDataList = dbHelper.getOrientationData()
+
+        val intent = Intent(this, GraphActivity::class.java).apply {
+            putExtra("orientation_data", orientationDataList as Serializable)
+        }
+        startActivity(intent)
+    }
+
 }
