@@ -5,12 +5,13 @@ import android.annotation.SuppressLint
 import android.content.ContentValues
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.database.Cursor
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.widget.Button
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
@@ -26,11 +27,19 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
     private var accelerometer: Sensor? = null
     private var magnetometer: Sensor? = null
 
+    // Define a handler for scheduling database insertions
+    private val handler = Handler(Looper.getMainLooper())
+    private val databaseInsertInterval = 100L // 100 milliseconds
+
     private lateinit var rollTextView: TextView
     private lateinit var pitchTextView: TextView
     private lateinit var yawTextView: TextView
     private lateinit var dbHelper: DatabaseHelper
 
+    // Declare roll, pitch, and yaw as class-level variables
+    private var roll = 0f
+    private var pitch = 0f
+    private var yaw = 0f
 
     // Magnetometer reading
     private var magnetometerReading = FloatArray(3)
@@ -53,11 +62,23 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         magnetometer = sensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD)
         initializeSensors()
         dbHelper = DatabaseHelper(this)
-        printOrientationData()
         val graphButton = findViewById<Button>(R.id.graphButton)
         graphButton.setOnClickListener {
             navigateToGraphActivity()
         }
+        startPeriodicDatabaseInsertion()
+
+    }
+    private fun startPeriodicDatabaseInsertion() {
+        handler.postDelayed(object : Runnable {
+            override fun run() {
+                // Add orientation data to the database
+                addOrientation(roll, pitch, yaw)
+
+                // Schedule the next insertion after the interval
+                handler.postDelayed(this, databaseInsertInterval)
+            }
+        }, databaseInsertInterval)
     }
     private fun addOrientation(roll: Float, pitch: Float, yaw: Float) {
         val db = dbHelper.writableDatabase
@@ -71,8 +92,6 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         db.insert(DatabaseHelper.TABLE_ORIENTATION, null, values)
         db.close()
     }
-
-
 
     private fun arePermissionsGranted(): Boolean {
         for (permission in permissions) {
@@ -96,10 +115,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         if (requestCode == requestCode) {
             // Check if all permissions are granted
             if (arePermissionsGranted()) {
-                // Permissions are granted, initialize sensors
                 initializeSensors()
-            } else {
-                // Permissions are not granted, handle accordingly (e.g., show a message to the user)
             }
         }
     }
@@ -113,11 +129,6 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         sensorManager.registerListener(this, magnetometer, SensorManager.SENSOR_DELAY_NORMAL)
     }
 
-    override fun onPause() {
-        super.onPause()
-        sensorManager.unregisterListener(this)
-    }
-
     override fun onResume() {
         super.onResume()
         if (arePermissionsGranted()) {
@@ -128,14 +139,15 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
         // Do nothing
     }
+    override fun onPause() {
+        super.onPause()
+        sensorManager.unregisterListener(this)
+    }
+
 
 
     @SuppressLint("SetTextI18n")
     override fun onSensorChanged(event: SensorEvent?) {
-        var roll = 0f
-        var pitch = 0f
-        var yaw = 0f
-
         event?.let {
             when (it.sensor.type) {
                 Sensor.TYPE_ACCELEROMETER -> {
@@ -198,41 +210,10 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             } else {
                 yawTextView.text = "Yaw: N/A (Magnetometer not available)"
             }
-
-            // Call addOrientation with the updated values of roll, pitch, and yaw
-            addOrientation(roll, pitch, yaw)
+//            addOrientation(roll, pitch, yaw)
         }
     }
-    @SuppressLint("Range")
-    private fun printOrientationData() {
-        val db = dbHelper.readableDatabase
-        val projection = arrayOf(DatabaseHelper.KEY_ROLL, DatabaseHelper.KEY_PITCH, DatabaseHelper.KEY_YAW)
-        val cursor: Cursor = db.query(
-            DatabaseHelper.TABLE_ORIENTATION,  // The table to query
-            projection,                         // The columns to return
-            null,                               // The columns for the WHERE clause
-            null,                               // The values for the WHERE clause
-            null,                               // don't group the rows
-            null,                               // don't filter by row groups
-            null                                // The sort order
-        )
 
-        // Iterate through the cursor and print the orientation data
-        if (cursor.moveToFirst()) {
-            do {
-                val roll = cursor.getFloat(cursor.getColumnIndex(DatabaseHelper.KEY_ROLL))
-                val pitch = cursor.getFloat(cursor.getColumnIndex(DatabaseHelper.KEY_PITCH))
-                val yaw = cursor.getFloat(cursor.getColumnIndex(DatabaseHelper.KEY_YAW))
-
-                // Print the orientation data
-                println("Roll: $roll, Pitch: $pitch, Yaw: $yaw")
-            } while (cursor.moveToNext())
-        }
-
-        // Close the cursor and the database connection
-        cursor.close()
-        db.close()
-    }
     private fun navigateToGraphActivity() {
         // Retrieve orientation data from the database
         val orientationDataList = dbHelper.getOrientationData()
@@ -242,5 +223,4 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         }
         startActivity(intent)
     }
-
 }
