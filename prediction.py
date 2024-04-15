@@ -1,3 +1,6 @@
+import numpy as np
+import matplotlib.dates as mdates
+import matplotlib.pyplot as plt
 import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression
@@ -27,10 +30,8 @@ y_pred = model.predict(X_test)
 mse = mean_squared_error(y_test, y_pred)
 print("Mean Squared Error:", mse)
 
-# Now, you can use this trained model to predict the roll, pitch, and yaw for the next 20 seconds
-# Assuming the timestamp of the last data point in the dataset is the starting point for prediction
 start_timestamp = data['Time'].iloc[-1]
-end_timestamp = start_timestamp + 20
+end_timestamp = start_timestamp + 10
 
 # Create a DataFrame with timestamps from start to end
 future_timestamps = pd.DataFrame({'Time': range(int(start_timestamp), int(end_timestamp) + 1)})
@@ -38,5 +39,51 @@ future_timestamps = pd.DataFrame({'Time': range(int(start_timestamp), int(end_ti
 # Make predictions for the future timestamps
 future_predictions = model.predict(future_timestamps)
 
-print("Predicted roll, pitch, yaw for the next 20 seconds:")
-print(future_predictions)
+# Convert timestamps back to timedelta format
+future_timestamps['Time'] = pd.to_timedelta(future_timestamps['Time'], unit='s')
+
+# Create a DataFrame for future predictions including time
+future_predictions_df = pd.DataFrame(future_predictions, columns=['Roll', 'Pitch', 'Yaw'])
+future_predictions_df['Time'] = future_timestamps['Time']
+
+print("Predicted roll, pitch, yaw for the next 10 seconds:")
+print(future_predictions_df)
+
+data = pd.read_csv("/Users/sarvajeethuk/Desktop/orientation_data.csv")
+
+# Generate numerical x-values for actual data and future predictions
+num_actual_time = np.arange(len(data['Time']))
+num_future_time = np.arange(len(data['Time']), len(data['Time']) + len(future_predictions_df['Time']))
+
+# Plot actual vs predicted values for Roll, Pitch, and Yaw
+plt.figure(figsize=(15, 10))
+
+# Plot for Roll
+plt.subplot(3, 1, 1)
+plt.plot(num_actual_time, data['Roll'], label='Actual Roll', color='blue')
+plt.plot(num_future_time, future_predictions_df['Roll'], label='Predicted Roll', linestyle='--', color='orange')
+plt.xlabel('Time')
+plt.ylabel('Roll')
+plt.title('Roll: Actual vs Predicted')
+plt.legend()
+
+# Plot for Pitch
+plt.subplot(3, 1, 2)
+plt.plot(num_actual_time, data['Pitch'], label='Actual Pitch', color='green')
+plt.plot(num_future_time, future_predictions_df['Pitch'], label='Predicted Pitch', linestyle='--', color='red')
+plt.xlabel('Time')
+plt.ylabel('Pitch')
+plt.title('Pitch: Actual vs Predicted')
+plt.legend()
+
+# Plot for Yaw
+plt.subplot(3, 1, 3)
+plt.plot(num_actual_time, data['Yaw'], label='Actual Yaw', color='purple')
+plt.plot(num_future_time, future_predictions_df['Yaw'], label='Predicted Yaw', linestyle='--', color='brown')
+plt.xlabel('Time')
+plt.ylabel('Yaw')
+plt.title('Yaw: Actual vs Predicted')
+plt.legend()
+
+plt.tight_layout()
+plt.show()
